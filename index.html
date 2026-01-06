@@ -5,22 +5,16 @@
 <title>Brat Generator</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <link rel="icon" href="/favicon.png" type="image/png">
+<link rel="icon" href="/favicon.png" type="image/png">
 
-  <meta name="google-site-verification" content="xW7iSQEShEzsJyajPbZwTpE-2QL3KLkztk8xGXRdAYA" />
-  
-  <meta content='#8ACE00' name='theme-color'/>
-<meta content='#8ACE00' name='msapplication-navbutton-color'/>
-<meta content='yes' name='apple-mobile-web-app-capable'/>
-<meta content='#8ACE00' name='apple-mobile-web-app-status-bar-style'/>
+<meta content="#8ACE00" name="theme-color"/>
+<meta content="#8ACE00" name="msapplication-navbutton-color"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="#8ACE00" name="apple-mobile-web-app-status-bar-style"/>
 
-  
 <style>
+a{ text-decoration:none }
 
-  a {
-  text-decoration: none;
-}
-  
 body{
   margin:0;
   background:#8ACE00;
@@ -109,10 +103,7 @@ button{
   border-radius:50%;
   border:2px solid #111;
 }
-
-.circle.active{
-  background:#111;
-}
+.circle.active{ background:#111 }
 </style>
 </head>
 
@@ -120,7 +111,6 @@ button{
 <div class="box">
   <a href="/"><h2>BRAT GENERATOR</h2></a>
 
-  <!-- TOP MODE SWITCH -->
   <div class="toggle">
     <div onclick="setMode('scratch')"><span class="circle active" id="t1"></span>Blurry</div>
     <div onclick="setMode('clean')"><span class="circle" id="t2"></span>Scratch</div>
@@ -133,7 +123,6 @@ button{
 
   <input id="textInput" maxlength="70" value="brat">
 
-  <!-- BOTTOM MODE SWITCH -->
   <div class="toggle">
     <div onclick="setMode('scratch')"><span class="circle active" id="m1"></span>Blurry</div>
     <div onclick="setMode('clean')"><span class="circle" id="m2"></span>Scratch</div>
@@ -144,9 +133,9 @@ button{
 </div>
 
 <script>
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const input = document.getElementById("textInput");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+const input=document.getElementById("textInput");
 
 let bgMode="scratch";
 let needsRedraw=true;
@@ -158,12 +147,10 @@ img.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABAAAAAQACAMAAABIw9uxAAABu
 const grainMap=new Map();
 
 function resizeCanvas(){
-  const wrap=document.querySelector(".canvas-wrap");
   canvas.width=540;
   canvas.height=960;
   needsRedraw=true;
 }
-window.addEventListener("resize",resizeCanvas);
 resizeCanvas();
 
 function resetSeed(t){
@@ -213,52 +200,47 @@ function addGrain(c,ctx,str){
   ctx.drawImage(grainMap.get(c.width),0,0);
 }
 
+/* ===== FIXED TEXT POSITION ===== */
 function drawText(c,ctx,text){
   resetSeed(text);
   let fs=180;
   const lines=splitText(text);
 
   do{
-    ctx.font=`300 ${fs}px Arial`;
+    ctx.font=`400 ${fs}px Arial`;
     fs-=2;
   }while(lines.some(l=>ctx.measureText(l).width>c.width*0.85));
 
-  const lh=fs*1.1;
+  const lh=fs*1.25;
   const y=c.height/2-(lines.length*lh)/2+lh/2;
 
   ctx.textAlign="center";
   ctx.textBaseline="middle";
-  ctx.fillStyle="#111";
+  ctx.fillStyle="#000";
 
-  if(bgMode==="scratch"){
-    ctx.globalAlpha=0.15;
-    ctx.filter="blur(2px)";
-    for(let i=0;i<6;i++){
-      ctx.save();
-      ctx.translate(c.width/2+(rnd()-0.5)*6,y+(rnd()-0.5)*6);
-      lines.forEach((l,j)=>ctx.fillText(l,0,j*lh));
-      ctx.restore();
-    }
-  }
+  const bratStyle=(bgMode==="scratch"||bgMode==="clean");
 
-  ctx.globalAlpha=0.95;
-  ctx.filter=bgMode==="scratch"?"blur(2px)":"none";
   ctx.save();
   ctx.translate(c.width/2,y);
-  lines.forEach((l,j)=>ctx.fillText(l,0,j*lh));
-  ctx.restore();
 
-  ctx.globalAlpha=1;
+  if(bratStyle){
+    ctx.filter="blur(1.6px)";
+    ctx.scale(1.02,1.02);   // scale AFTER centering (fix)
+  }
+
+  lines.forEach((l,j)=>ctx.fillText(l,0,j*lh));
+
+  ctx.restore();
   ctx.filter="none";
 
-  if(bgMode==="scratch") addGrain(c,ctx,10);
+  if(bgMode==="clean") addGrain(c,ctx,10);
 }
 
 function render(c,ctx,text){
   ctx.fillStyle="#8ACE00";
   ctx.fillRect(0,0,c.width,c.height);
 
-  if(bgMode!=="noimg" && img.complete){
+  if(bgMode==="clean" && img.complete){
     const s=c.width;
     ctx.save();
     ctx.globalAlpha=0.55;
@@ -266,6 +248,7 @@ function render(c,ctx,text){
     ctx.drawImage(img,c.width/2-s/2,c.height/2-s/2,s,s);
     ctx.restore();
   }
+
   drawText(c,ctx,text);
 }
 
@@ -289,63 +272,21 @@ function setMode(m){
   needsRedraw=true;
 }
 
-// ---------- DOWNLOAD WITH FRESH UNIQUE FILENAME ----------
 function randomID(len=4){
   return Math.random().toString(36).substring(2,2+len);
 }
 
 function download(){
-  // Create overlay animation
-  const overlay=document.createElement("div");
-  overlay.style.position="fixed";
-  overlay.style.top=0;
-  overlay.style.left=0;
-  overlay.style.width="100%";
-  overlay.style.height="100%";
-  overlay.style.background="rgba(0,0,0,0.6)";
-  overlay.style.color="#fff";
-  overlay.style.display="flex";
-  overlay.style.justifyContent="center";
-  overlay.style.alignItems="center";
-  overlay.style.fontSize="24px";
-  overlay.style.fontWeight="700";
-  overlay.style.zIndex=9999;
-  overlay.style.opacity=0;
-  overlay.innerText="Preparing Download...";
-  document.body.appendChild(overlay);
+  const c=document.createElement("canvas");
+  c.width=540;
+  c.height=960;
+  const t=c.getContext("2d");
+  render(c,t,input.value);
 
-  // Fade in
-  let op=0;
-  const fadeIn=setInterval(()=>{
-    op+=0.05;
-    overlay.style.opacity=op;
-    if(op>=1) clearInterval(fadeIn);
-  },16);
-
-  setTimeout(()=>{
-    const c=document.createElement("canvas");
-    c.width=1080;
-    c.height=1920;
-    const t=c.getContext("2d");
-    render(c,t,input.value);
-
-    const a=document.createElement("a");
-    const shortTime = Date.now().toString().slice(-5); // last 5 digits of timestamp
-    a.download = `brat_${shortTime}_${randomID()}.png`; // always unique
-    a.href=c.toDataURL("image/png");
-    a.click();
-
-    // Fade out and remove overlay
-    let op2=1;
-    const fadeOut=setInterval(()=>{
-      op2-=0.05;
-      overlay.style.opacity=op2;
-      if(op2<=0){
-        clearInterval(fadeOut);
-        overlay.remove();
-      }
-    },16);
-  },500);
+  const a=document.createElement("a");
+  a.download=`brat_${Date.now().toString().slice(-5)}_${randomID()}.png`;
+  a.href=c.toDataURL("image/png");
+  a.click();
 }
 </script>
 </body>
