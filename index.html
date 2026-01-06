@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Brat Generator – Responsive</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+  margin:0;
+  background:#8ACE00;
+  font-family:Arial,Helvetica,sans-serif;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+}
+
+.box{
+  background:#8ACE00;
+  padding:16px;
+  border-radius:14px;
+  width:100%;
+  max-width:420px;
+}
+
+h2{
+  text-align:center;
+  color:#111;
+  font-weight:900;
+  letter-spacing:4px;
+  margin:6px 0 10px;
+}
+
+input{
+  width:100%;
+  height:42px;
+  background:#fff;
+  color:#111;
+  border:none;
+  outline:none;
+  font-size:18px;
+  padding:10px;
+  border-radius:8px;
+  font-weight:700;
+}
+
+.canvas-wrap{
+  width:100%;
+  aspect-ratio:9/16;
+  margin-top:14px;
+}
+
+canvas{
+  width:100%;
+  height:100%;
+  border-radius:10px;
+  display:block;
+}
+
+button{
+  width:100%;
+  margin-top:14px;
+  background:#111;
+  color:#fff;
+  border:none;
+  padding:12px;
+  border-radius:8px;
+  font-size:15px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.toggle{
+  display:flex;
+  justify-content:center;
+  gap:14px;
+  margin:10px 0;
+  flex-wrap:wrap;
+}
+
+.toggle div{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:700;
+}
+
+.circle{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  border:2px solid #111;
+}
+
+.circle.active{
+  background:#111;
+}
+</style>
+</head>
+
+<body>
+<div class="box">
+  <h2>BRAT</h2>
+
+  <!-- TOP MODE SWITCH -->
+  <div class="toggle">
+    <div onclick="setMode('scratch')"><span class="circle active" id="t1"></span>Blurry</div>
+    <div onclick="setMode('clean')"><span class="circle" id="t2"></span>Scratch</div>
+    <div onclick="setMode('noimg')"><span class="circle" id="t3"></span>Clean</div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <input id="textInput" maxlength="70" value="brat">
+
+  <!-- BOTTOM MODE SWITCH -->
+  <div class="toggle">
+    <div onclick="setMode('scratch')"><span class="circle active" id="m1"></span>Blurry</div>
+    <div onclick="setMode('clean')"><span class="circle" id="m2"></span>Scratch</div>
+    <div onclick="setMode('noimg')"><span class="circle" id="m3"></span>Clean</div>
+  </div>
+
+  <button onclick="download()">DOWNLOAD</button>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const input = document.getElementById("textInput");
+
+let bgMode="scratch";
+let needsRedraw=true;
+let seed=1;
+
+const img=new Image();
+img.src="data:image/png;base64,PASTE_YOUR_BASE64_HERE";
+
+const grainMap=new Map();
+
+function resizeCanvas(){
+  const wrap=document.querySelector(".canvas-wrap");
+  canvas.width=540;
+  canvas.height=960;
+  needsRedraw=true;
+}
+window.addEventListener("resize",resizeCanvas);
+resizeCanvas();
+
+function resetSeed(t){
+  seed=0;
+  for(let i=0;i<t.length;i++) seed+=t.charCodeAt(i)*(i+1);
+}
+function rnd(){
+  seed=(seed*9301+49297)%233280;
+  return seed/233280;
+}
+
+input.addEventListener("input",()=>needsRedraw=true);
+img.onload=()=>needsRedraw=true;
+
+function splitText(t,max=15,total=70){
+  t=t.slice(0,total);
+  const w=t.split(" ");
+  const l=[];
+  let line="";
+  for(let x of w){
+    if((line+" "+x).trim().length<=max){
+      line=(line+" "+x).trim();
+    }else{
+      l.push(line);
+      line=x;
+    }
+  }
+  if(line) l.push(line);
+  return l;
+}
+
+function addGrain(c,ctx,str){
+  if(!grainMap.has(c.width)){
+    const gCan=document.createElement("canvas");
+    gCan.width=c.width;
+    gCan.height=c.height;
+    const g=gCan.getContext("2d");
+    const d=g.createImageData(c.width,c.height);
+    for(let i=0;i<d.data.length;i+=4){
+      const n=(rnd()-0.5)*str;
+      d.data[i]=d.data[i+1]=d.data[i+2]=128+n;
+      d.data[i+3]=24;
+    }
+    g.putImageData(d,0,0);
+    grainMap.set(c.width,gCan);
+  }
+  ctx.drawImage(grainMap.get(c.width),0,0);
+}
+
+function drawText(c,ctx,text){
+  resetSeed(text);
+  let fs=180;
+  const lines=splitText(text);
+
+  do{
+    ctx.font=`300 ${fs}px Arial`;
+    fs-=2;
+  }while(lines.some(l=>ctx.measureText(l).width>c.width*0.85));
+
+  const lh=fs*1.1;
+  const y=c.height/2-(lines.length*lh)/2+lh/2;
+
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.fillStyle="#111";
+
+  if(bgMode==="scratch"){
+    ctx.globalAlpha=0.15;
+    ctx.filter="blur(2px)";
+    for(let i=0;i<6;i++){
+      ctx.save();
+      ctx.translate(c.width/2+(rnd()-0.5)*6,y+(rnd()-0.5)*6);
+      lines.forEach((l,j)=>ctx.fillText(l,0,j*lh));
+      ctx.restore();
+    }
+  }
+
+  ctx.globalAlpha=0.95;
+  ctx.filter=bgMode==="scratch"?"blur(2px)":"none";
+  ctx.save();
+  ctx.translate(c.width/2,y);
+  lines.forEach((l,j)=>ctx.fillText(l,0,j*lh));
+  ctx.restore();
+
+  ctx.globalAlpha=1;
+  ctx.filter="none";
+
+  if(bgMode==="scratch") addGrain(c,ctx,10);
+}
+
+function render(c,ctx,text){
+  ctx.fillStyle="#8ACE00";
+  ctx.fillRect(0,0,c.width,c.height);
+
+  if(bgMode!=="noimg" && img.complete){
+    const s=c.width;
+    ctx.save();
+    ctx.globalAlpha=0.55;
+    ctx.globalCompositeOperation="multiply";
+    ctx.drawImage(img,c.width/2-s/2,c.height/2-s/2,s,s);
+    ctx.restore();
+  }
+  drawText(c,ctx,text);
+}
+
+function loop(){
+  if(needsRedraw){
+    render(canvas,ctx,input.value);
+    needsRedraw=false;
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+
+function setMode(m){
+  bgMode=m;
+  ["m1","m2","m3","t1","t2","t3"].forEach(id=>{
+    document.getElementById(id).classList.remove("active");
+  });
+  if(m==="scratch"){m1.classList.add("active");t1.classList.add("active");}
+  if(m==="clean"){m2.classList.add("active");t2.classList.add("active");}
+  if(m==="noimg"){m3.classList.add("active");t3.classList.add("active");}
+  needsRedraw=true;
+}
+
+function download(){
+  const c=document.createElement("canvas");
+  c.width=1080;
+  c.height=1920;
+  const t=c.getContext("2d");
+  render(c,t,input.value);
+  const a=document.createElement("a");
+  a.download="brat.png";
+  a.href=c.toDataURL("image/png");
+  a.click();
+}
+</script>
+</body>
+</html>
