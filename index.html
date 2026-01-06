@@ -113,10 +113,11 @@ button{
 <div class="box">
   <a href="/"><h2>BRAT GENERATOR</h2></a>
 
+  <!-- TOP MODES -->
   <div class="toggle">
-    <div onclick="setMode('scratch')"><span class="circle active" id="t1"></span>Blurry</div>
-    <div onclick="setMode('clean')"><span class="circle" id="t2"></span>Scratch</div>
-    <div onclick="setMode('noimg')"><span class="circle" id="t3"></span>Clean</div>
+    <div onclick="setMode('blurry')"><span class="circle active" id="t1"></span>Blurry</div>
+    <div onclick="setMode('scratch')"><span class="circle" id="t2"></span>Scratch</div>
+    <div onclick="setMode('clean')"><span class="circle" id="t3"></span>Clean</div>
   </div>
 
   <div class="canvas-wrap">
@@ -125,10 +126,11 @@ button{
 
   <input id="textInput" maxlength="70" value="brat">
 
+  <!-- BOTTOM MODES -->
   <div class="toggle">
-    <div onclick="setMode('scratch')"><span class="circle active" id="m1"></span>Blurry</div>
-    <div onclick="setMode('clean')"><span class="circle" id="m2"></span>Scratch</div>
-    <div onclick="setMode('noimg')"><span class="circle" id="m3"></span>Clean</div>
+    <div onclick="setMode('blurry')"><span class="circle active" id="m1"></span>Blurry</div>
+    <div onclick="setMode('scratch')"><span class="circle" id="m2"></span>Scratch</div>
+    <div onclick="setMode('clean')"><span class="circle" id="m3"></span>Clean</div>
   </div>
 
   <button onclick="download()">DOWNLOAD</button>
@@ -139,7 +141,7 @@ const canvas=document.getElementById("canvas");
 const ctx=canvas.getContext("2d");
 const input=document.getElementById("textInput");
 
-let bgMode="scratch";
+let bgMode="blurry";
 let needsRedraw=true;
 let seed=1;
 
@@ -202,7 +204,7 @@ function addGrain(c,ctx,str){
   ctx.drawImage(grainMap.get(c.width),0,0);
 }
 
-/* ===== FIXED TEXT POSITION ===== */
+/* ===== TEXT RENDER ===== */
 function drawText(c,ctx,text){
   resetSeed(text);
   let fs=180;
@@ -220,29 +222,29 @@ function drawText(c,ctx,text){
   ctx.textBaseline="middle";
   ctx.fillStyle="#000";
 
-  const bratStyle=(bgMode==="scratch"||bgMode==="clean");
-
   ctx.save();
   ctx.translate(c.width/2,y);
 
-  if(bratStyle){
+  if(bgMode==="blurry" || bgMode==="scratch"){
     ctx.filter="blur(1.6px)";
-    ctx.scale(1.02,1.02);   // scale AFTER centering (fix)
+    ctx.scale(1.02,1.02);
   }
 
-  lines.forEach((l,j)=>ctx.fillText(l,0,j*lh));
+  lines.forEach((line,j)=>{
+    ctx.fillText(line,0,j*lh);
+  });
 
   ctx.restore();
   ctx.filter="none";
 
-  if(bgMode==="clean") addGrain(c,ctx,10);
+  if(bgMode==="scratch") addGrain(c,ctx,10);
 }
 
 function render(c,ctx,text){
   ctx.fillStyle="#8ACE00";
   ctx.fillRect(0,0,c.width,c.height);
 
-  if(bgMode==="clean" && img.complete){
+  if(bgMode==="scratch" && img.complete){
     const s=c.width;
     ctx.save();
     ctx.globalAlpha=0.55;
@@ -268,9 +270,11 @@ function setMode(m){
   ["m1","m2","m3","t1","t2","t3"].forEach(id=>{
     document.getElementById(id).classList.remove("active");
   });
-  if(m==="scratch"){m1.classList.add("active");t1.classList.add("active");}
-  if(m==="clean"){m2.classList.add("active");t2.classList.add("active");}
-  if(m==="noimg"){m3.classList.add("active");t3.classList.add("active");}
+
+  if(m==="blurry"){m1.classList.add("active");t1.classList.add("active");}
+  if(m==="scratch"){m2.classList.add("active");t2.classList.add("active");}
+  if(m==="clean"){m3.classList.add("active");t3.classList.add("active");}
+
   needsRedraw=true;
 }
 
@@ -279,16 +283,54 @@ function randomID(len=4){
 }
 
 function download(){
-  const c=document.createElement("canvas");
-  c.width=540;
-  c.height=960;
-  const t=c.getContext("2d");
-  render(c,t,input.value);
+  // CREATE OVERLAY
+  const overlay=document.createElement("div");
+  overlay.style.position="fixed";
+  overlay.style.inset=0;
+  overlay.style.background="rgba(0,0,0,0.6)";
+  overlay.style.color="#fff";
+  overlay.style.display="flex";
+  overlay.style.alignItems="center";
+  overlay.style.justifyContent="center";
+  overlay.style.fontSize="24px";
+  overlay.style.fontWeight="700";
+  overlay.style.zIndex=9999;
+  overlay.style.opacity=0;
+  overlay.innerText="Preparing Download...";
+  document.body.appendChild(overlay);
 
-  const a=document.createElement("a");
-  a.download=`brat_${Date.now().toString().slice(-5)}_${randomID()}.png`;
-  a.href=c.toDataURL("image/png");
-  a.click();
+  // FADE IN
+  let op=0;
+  const fadeIn=setInterval(()=>{
+    op+=0.05;
+    overlay.style.opacity=op;
+    if(op>=1) clearInterval(fadeIn);
+  },16);
+
+  // SMALL DELAY TO SHOW OVERLAY
+  setTimeout(()=>{
+    const c=document.createElement("canvas");
+    c.width=540;
+    c.height=960;
+    const t=c.getContext("2d");
+    render(c,t,input.value);
+
+    const a=document.createElement("a");
+    a.download=`brat_${Date.now().toString().slice(-5)}_${randomID()}.png`;
+    a.href=c.toDataURL("image/png");
+    a.click();
+
+    // FADE OUT
+    let op2=1;
+    const fadeOut=setInterval(()=>{
+      op2-=0.05;
+      overlay.style.opacity=op2;
+      if(op2<=0){
+        clearInterval(fadeOut);
+        overlay.remove();
+      }
+    },16);
+  },500); // delay to show overlay
 }
 </script>
 </body>
